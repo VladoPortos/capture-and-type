@@ -3,7 +3,9 @@ import numpy as np
 import pygetwindow as gw
 import pyautogui
 from pynput.keyboard import Key, Controller
+import threading
 import time
+import argparse
 
 keyboard = Controller()
 
@@ -56,7 +58,6 @@ def press_keys(keys):
             keyboard.release(key)
 
 
-
 # Define the reference color (BGR format)
 reference_color = (255, 255, 0)  # Cyan in BGR
 
@@ -73,19 +74,39 @@ key_positions = {
 }
 
 
-def main():
+def detect_keys(window, delay):
+    while window.isActive:
+        img = capture_window(window)
+        highlighted_keys = process_image(
+            img, reference_color, key_positions)
+        if highlighted_keys:
+            press_keys(highlighted_keys)
+        time.sleep(delay)  # Adjust the delay as needed
+
+
+def timer(timeout=30):
+    time.sleep(timeout)
+    print("No blinking detected for {} seconds. Terminating...".format(timeout))
+    exit()
+
+
+def main(delay):
     window = wait_and_focus_window("Teclado")
     if window:
-        while True:
-            img = capture_window(window)
-            highlighted_keys = process_image(
-                img, reference_color, key_positions)
-            if highlighted_keys:
-                press_keys(highlighted_keys)
-            time.sleep(0.5)  # Adjust the delay as needed
+        key_detection_thread = threading.Thread(
+            target=detect_keys, args=(window, delay))
+        key_detection_thread.start()
+
+        timer_thread = threading.Thread(target=timer, args=(30,))
+        timer_thread.start()
     else:
         print("Failed to find the window.")
 
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--delay", type=float, default=0.1,
+                        help="Delay between key detection in seconds")
+    args = parser.parse_args()
+
+    main(args.delay)
